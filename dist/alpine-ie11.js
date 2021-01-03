@@ -3643,6 +3643,56 @@
     }
   });
 
+  var nativeAssign = Object.assign;
+  var defineProperty$2 = Object.defineProperty;
+
+  // `Object.assign` method
+  // https://tc39.github.io/ecma262/#sec-object.assign
+  var objectAssign = !nativeAssign || fails(function () {
+    // should have correct order of operations (Edge bug)
+    if (descriptors && nativeAssign({ b: 1 }, nativeAssign(defineProperty$2({}, 'a', {
+      enumerable: true,
+      get: function () {
+        defineProperty$2(this, 'b', {
+          value: 3,
+          enumerable: false
+        });
+      }
+    }), { b: 2 })).b !== 1) return true;
+    // should work with symbols and should have deterministic property order (V8 bug)
+    var A = {};
+    var B = {};
+    // eslint-disable-next-line no-undef
+    var symbol = Symbol();
+    var alphabet = 'abcdefghijklmnopqrst';
+    A[symbol] = 7;
+    alphabet.split('').forEach(function (chr) { B[chr] = chr; });
+    return nativeAssign({}, A)[symbol] != 7 || objectKeys(nativeAssign({}, B)).join('') != alphabet;
+  }) ? function assign(target, source) { // eslint-disable-line no-unused-vars
+    var T = toObject(target);
+    var argumentsLength = arguments.length;
+    var index = 1;
+    var getOwnPropertySymbols = objectGetOwnPropertySymbols.f;
+    var propertyIsEnumerable = objectPropertyIsEnumerable.f;
+    while (argumentsLength > index) {
+      var S = indexedObject(arguments[index++]);
+      var keys = getOwnPropertySymbols ? objectKeys(S).concat(getOwnPropertySymbols(S)) : objectKeys(S);
+      var length = keys.length;
+      var j = 0;
+      var key;
+      while (length > j) {
+        key = keys[j++];
+        if (!descriptors || propertyIsEnumerable.call(S, key)) T[key] = S[key];
+      }
+    } return T;
+  } : nativeAssign;
+
+  // `Object.assign` method
+  // https://tc39.github.io/ecma262/#sec-object.assign
+  _export({ target: 'Object', stat: true, forced: Object.assign !== objectAssign }, {
+    assign: objectAssign
+  });
+
   var propertyIsEnumerable = objectPropertyIsEnumerable.f;
 
   // `Object.{ entries, values }` methods implementation
@@ -4970,7 +5020,7 @@
     }
   });
 
-  var defineProperty$2 = objectDefineProperty.f;
+  var defineProperty$3 = objectDefineProperty.f;
 
   var FunctionPrototype = Function.prototype;
   var FunctionPrototypeToString = FunctionPrototype.toString;
@@ -4980,7 +5030,7 @@
   // Function instances `.name` property
   // https://tc39.github.io/ecma262/#sec-function-instances-name
   if (descriptors && !(NAME in FunctionPrototype)) {
-    defineProperty$2(FunctionPrototype, NAME, {
+    defineProperty$3(FunctionPrototype, NAME, {
       configurable: true,
       get: function () {
         try {
@@ -5039,7 +5089,7 @@
 
   var getOwnPropertyNames = objectGetOwnPropertyNames.f;
   var getOwnPropertyDescriptor$3 = objectGetOwnPropertyDescriptor.f;
-  var defineProperty$3 = objectDefineProperty.f;
+  var defineProperty$4 = objectDefineProperty.f;
   var trim = stringTrim.trim;
 
   var NUMBER = 'Number';
@@ -5097,7 +5147,7 @@
       'MIN_SAFE_INTEGER,parseFloat,parseInt,isInteger'
     ).split(','), j = 0, key; keys$1.length > j; j++) {
       if (has(NativeNumber, key = keys$1[j]) && !has(NumberWrapper, key)) {
-        defineProperty$3(NumberWrapper, key, getOwnPropertyDescriptor$3(NativeNumber, key));
+        defineProperty$4(NumberWrapper, key, getOwnPropertyDescriptor$3(NativeNumber, key));
       }
     }
     NumberWrapper.prototype = NumberPrototype;
@@ -5270,7 +5320,7 @@
     return Constructor;
   };
 
-  var defineProperty$4 = objectDefineProperty.f;
+  var defineProperty$5 = objectDefineProperty.f;
 
 
 
@@ -5412,7 +5462,7 @@
           return define(this, value = value === 0 ? 0 : value, value);
         }
       });
-      if (descriptors) defineProperty$4(C.prototype, 'size', {
+      if (descriptors) defineProperty$5(C.prototype, 'size', {
         get: function () {
           return getInternalState(this).size;
         }
@@ -7162,7 +7212,7 @@
       this.$el = el;
       var dataAttr = this.$el.getAttribute('x-data');
       var dataExpression = dataAttr === '' ? '{}' : dataAttr;
-      var initExpression = this.$el.getAttribute('x-init');
+      var initExpression = this.$el.getAttribute('x-init') || this.$el.getAttribute("x-setup");
       var dataExtras = {
         $el: this.$el
       };
@@ -7233,6 +7283,15 @@
 
         if (!this.watchers[property]) this.watchers[property] = [];
         this.watchers[property].push(callback);
+      }.bind(this);
+
+      this.unobservedData.$reactive = function (refData) {
+        _newArrowCheck(this, _this);
+
+        var observable = this.wrapDataInObservable(refData);
+        this.$data = Object.assign(this.$data, observable.data);
+        this.membrane = Object.assign(this.membrane, observable.membrane);
+        this.unobservedData = Object.assign(this.unobservedData, refData);
       }.bind(this);
 
       this.showDirectiveStack = [];

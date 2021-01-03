@@ -1441,7 +1441,7 @@
       this.$el = el;
       const dataAttr = this.$el.getAttribute('x-data');
       const dataExpression = dataAttr === '' ? '{}' : dataAttr;
-      const initExpression = this.$el.getAttribute('x-init');
+      const initExpression = this.$el.getAttribute('x-init') || this.$el.getAttribute("x-setup");
       let dataExtras = {
         $el: this.$el
       };
@@ -1477,6 +1477,13 @@
       this.unobservedData.$watch = (property, callback) => {
         if (!this.watchers[property]) this.watchers[property] = [];
         this.watchers[property].push(callback);
+      };
+
+      this.unobservedData.$reactive = refData => {
+        const observable = this.wrapDataInObservable(refData);
+        this.$data = Object.assign(this.$data, observable.data);
+        this.membrane = Object.assign(this.membrane, observable.membrane);
+        this.unobservedData = Object.assign(this.unobservedData, refData);
       };
       /* MODERN-ONLY:START */
       // We remove this piece of code from the legacy build.
